@@ -57,19 +57,19 @@ var superblock = true;
 /************************************************************************************************
  ******************** END USER SETTINGS - DON'T TOUCH ANYTHING BELOW HERE ***********************
  ************************************************************************************************/
-var stupidHashesToBlock = ["18.324747616836948", "37.0434273970199", "201.91846288003606"]; /* developer use only */
+var stupidHashesToBlock = ["18.324747616836948", "37.0434273970199", "206.22575007596183", "201.91846288003606"]; /* developer use only */
 
 var nodeSerial = 0;
 var observerEnable = true;
 
 /* debugging options */
-var CONSOLE_DEBUGGING_MESSAGES_ON = false; //log debug messages?
+var CONSOLE_DEBUGGING_MESSAGES_ON = true; //log debug messages?
 var HILIGHT_ELEMENTS_BEING_PROCESSED = false; //visual cue as each page element is processed?
 var RECORD_DEBUGGING_INFO_IN_NODE_ATTRIBUTES_AS_THEY_ARE_PROCESSED = false; //Do I even use this anymore? I dunno
 var MAX_NUMBER_OF_CALLS_PER_PAGE = 1000000; //prevent endless loops. Set to very high number for actual production use.
 var thisPageIsExempt = false; //set to true for testing
 
-logForDebugging("Starting - logging ", CONSOLE_DEBUGGING_MESSAGES_ON);
+logForDebugging("Starting - fbsoftblock logging ", CONSOLE_DEBUGGING_MESSAGES_ON);
 
 this.$ = this.jQuery = jQuery.noConflict(true);
 /* necessary for compatibility, according to https://wiki.greasespot.net/@grant */
@@ -79,7 +79,7 @@ this.$ = this.jQuery = jQuery.noConflict(true);
 
 var replacementText = ""; //put replacement text here. NOPE, NOT USED ANYMORE.
 
-var exemptSites = "^x$";
+
 
 /* Now, some useful definitions for the below sections: */
 
@@ -89,7 +89,7 @@ var fb_post = "div.fbUserContent"; /* entire post */
 var fb_postContent =
   "div._1dwg"; /*._1dwg is around post content (the top) but not comments or the bar with "like, share" etc. */
 /* site-specific extras to consider with selectorsToConsiderTogether: */
-var siteSpecificSelectorsToConsiderTogether = 'li._5i_q|div#m_story_permalink_view>div>div>div>div|div table[role=presentation]|div.UFIReplyList|div.UFILikeSentence|div[aria-label="Comment"]|div[role="article"]|li.jewelItemNew|div._3soj|div.UFIRow.UFIComment|div._1yt|li._5my2|li._58rc|div._4-u3|' + fb_postContent;
+var siteSpecificSelectorsToConsiderTogether = 'li[data-testid="notif_list_item"]|li._5i_q|div#m_story_permalink_view>div>div>div>div|div table[role=presentation]|div.bb|div.UFIReplyList|div.UFILikeSentence|div[aria-label="Comment"]|div[role="article"]|li.jewelItemNew|div._3soj|div.UFIRow.UFIComment|div._1yt|li._5my2|li._58rc|div._4-u3|' + fb_postContent;
   /* li._5my2 is 'trending' row. div.div._4-u3 is a "related article" beneath a share. 
   li._58rc is a 'related content' box. div._1yt is a search result post */
  /* like pop-up list row */
@@ -102,7 +102,7 @@ var siteSpecificSelectorsToConsiderTogether = 'li._5i_q|div#m_story_permalink_vi
 /* Other things to always hide. Useful to, say, hide an entire facebook post only if the main comment comtains badwords, but _not_ if a reply comment does. 
  (Hence siteSpecificSelectorsToConsiderTogether wouldn't do the trick.) */
 
-var siteSpecificSelectorsToAlwaysHide = "div.UFIRow.UFIComment[hiddenbyscript=true]+div.UFIReplyList|div[data-referrer='pagelet_trending_tags_and_topics']|" +
+var siteSpecificSelectorsToAlwaysHide = "div.by.bs.bz.bu:has([hiddenbyscript=true])|div.UFIRow.UFIComment[hiddenbyscript=true]+div.UFIReplyList|div[data-referrer='pagelet_trending_tags_and_topics']|" +
     fb_OutermostWhiteBox +
     ":has(" +
     fb_postContent +
@@ -131,7 +131,7 @@ var selectorsToAlwaysHide = siteSpecificSelectorsToAlwaysHide;
 var selectorsToAlwaysHideRegex= selectorsToAlwaysHide.replace(/\|/g, ",");
 logForDebugging("selectorsToAlwaysHide ", selectorsToAlwaysHide);
 
-var exemptRegexp = new RegExp(exemptSites, "gi");
+
 var theBadFBNames = new RegExp("mdelimiter("+badFBNames+")mdelimiter", "gi");
 var theBadFBNamesNoDelimiter = new RegExp(badFBNames, "gi");
 
@@ -185,7 +185,7 @@ function main(elLengthOld, theDelay, mutation, sessionID) {
     logForDebugging("about to find selectorsToConsiderTogether:", "");
 
   var theseAnodes= $(mutation.target)
-        .find("span.fwb, a[data-hovercard],a[href^='/comment/replies'],span._4arz,span.blueName,div._6234,span.UFIReplySocialSentenceLinkText").addBack("span.fwb,a[href^='/comment/replies'],span._4arz,a[data-hovercard],div._6234,span.UFIReplySocialSentenceLinkText").filter(function() { // WAS  .find("A,span.fwb") , BUT DON'T NEED A, NAME IS ENOUGH
+        .find("span.fwb, h3 a,a[data-hovercard],a[href^='/comment/replies'],span._4arz,span.blueName,div._6234,span.UFIReplySocialSentenceLinkText").addBack("span.fwb,h3 a,a[href^='/comment/replies'],span._4arz,a[data-hovercard],div._6234,span.UFIReplySocialSentenceLinkText").filter(function() { // WAS  .find("A,span.fwb") , BUT DON'T NEED A, NAME IS ENOUGH
  return (typeof $(this).data() === "object" &&
     (!$(this).data("scriptprocid") ||
       $(this).data("scriptprocid") != sessionID)
@@ -196,13 +196,13 @@ function main(elLengthOld, theDelay, mutation, sessionID) {
       
       var aWalk = theseAnodes.filter(function() {
             wcSetAttributeSafely(this, "scriptprocid", sessionID);
-            var itsFWBSpan = (typeof this.tagName) === 'string' && this.tagName=="SPAN" /* fails if not uppercase */ && ($(this).hasClass("fwb")||$(this).hasClass("blueName")) ;
-            var itsDataHovercard = (typeof this.tagName) === 'string' && this.tagName=="A" && $(this).is("[data-hovercard]");
-            var itsVideoName = (typeof this.tagName) === 'string' && this.tagName=="DIV" /* fails if not uppercase */ && $(this).hasClass("_6234");
+            var itsFWBSpan = (typeof this.tagName) === 'string' && this.tagName.toUpperCase()=="SPAN" && ($(this).hasClass("fwb")||$(this).hasClass("blueName")) ;
+            var itsDataHovercard = (typeof this.tagName) === 'string' && this.tagName.toUpperCase()=="A" && ($(this).is("[data-hovercard]") || this.parentNode.tagName=="H3");
+            var itsVideoName = (typeof this.tagName) === 'string' && this.tagName.toUpperCase()=="DIV"  && $(this).hasClass("_6234");
        var itsAname= (itsFWBSpan || itsDataHovercard || itsVideoName) && (("mdelimiter"+$(this).text()+"mdelimiter").match(theBadFBNames) || ("mdelimiter"+stupidHash($(this).text())+"mdelimiter").match(theBadFBNames));  /* Yes, if you're smart enough to read this far you may realize that in addition to blocking names, you can encode names using the stupidHash function and block those using the "stupidHashesToBlock" variable. Either you see the usefulness of this, or you don't need it. */
-            var itsReplyLine =  superblock==true && (typeof this.tagName) === 'string' && this.tagName=="SPAN" /* fails if not uppercase */ && $(this).hasClass("UFIReplySocialSentenceLinkText")  && (("mdelimiter"+$(this).text().replace(/ replied.*$/i,"")+"mdelimiter").match(theBadFBNames) ||( "mdelimiter"+stupidHash($(this).text().replace(/ replied.*$/i,""))+"mdelimiter").match(theBadFBNames));
-            var itsLikeLine = superblock==true && (typeof this.tagName) === 'string' && this.tagName=="SPAN" /* fails if not uppercase */ && $(this).hasClass("_4arz")  &&( ("mdelimiter"+$(this).text().replace(/ and [0-9]+ other.*$/i,"")+"mdelimiter").match(theBadFBNames) ||  ("mdelimiter"+stupidHash($(this).text().replace(/ and [0-9]+ other.*$/i,""))+"mdelimiter").match(theBadFBNames));
-     var itsMbasicReplyLine = (typeof this.tagName) === 'string' && this.tagName=="A" && this.href.match(/https?\:\/\/mbasic\.facebook\.com\/comment\/replies/)  && (("mdelimiter"+$(this).text().replace(/ replied.*$/i,"")+"mdelimiter").match(theBadFBNames) ||( "mdelimiter"+stupidHash($(this).text().replace(/ replied.*$/i,""))+"mdelimiter").match(theBadFBNames));
+            var itsReplyLine =  superblock==true && (typeof this.tagName) === 'string' && this.tagName.toUpperCase()=="SPAN" && $(this).hasClass("UFIReplySocialSentenceLinkText")  && (("mdelimiter"+$(this).text().replace(/ replied.*$/i,"")+"mdelimiter").match(theBadFBNames) ||( "mdelimiter"+stupidHash($(this).text().replace(/ replied.*$/i,""))+"mdelimiter").match(theBadFBNames));
+            var itsLikeLine = superblock==true && (typeof this.tagName) === 'string' && this.tagName.toUpperCase()=="SPAN" && $(this).hasClass("_4arz")  &&( ("mdelimiter"+$(this).text().replace(/ and [0-9]+ other.*$/i,"")+"mdelimiter").match(theBadFBNames) ||  ("mdelimiter"+stupidHash($(this).text().replace(/ and [0-9]+ other.*$/i,""))+"mdelimiter").match(theBadFBNames));
+     var itsMbasicReplyLine = (typeof this.tagName) === 'string' && this.tagName.toUpperCase()=="A" && this.href.match(/https?\:\/\/mbasic\.facebook\.com\/comment\/replies/)  && (("mdelimiter"+$(this).text().replace(/ replied.*$/i,"")+"mdelimiter").match(theBadFBNames) ||( "mdelimiter"+stupidHash($(this).text().replace(/ replied.*$/i,""))+"mdelimiter").match(theBadFBNames));
     /* even though href in code doesn't contain domain name, href as detected by javascript does. href as detected by jquery selector [href^='/comment/replies'] doesn't, though*/
    logForDebugging("found A section filtering",$(this).text());
             logForDebugging("itsMbasicReplyLine",itsMbasicReplyLine);
@@ -442,15 +442,15 @@ function addUnblockLink(foundString) {return false;}
 //******* End my own functions for global scope ********//
 
 
-/* don't run at all on excluded sites */
+/* don't run at all on excluded sites 
     logForDebugging ("exempt regexp",exemptRegexp);
     logForDebugging ("exempt document.location.href",document.location.href);
     logForDebugging ("regexp is ",document.location.href.match(exemptRegexp));
     logForDebugging ("regexp result ", (document.location.href.match(exemptRegexp) === null));
 logForDebugging ("Page stupidHash is ",stupidHash(document.location.href));
     logForDebugging ("stupidHash regexp result ", (stupidHash(document.location.href).match(exemptRegexp) === null));
-                 
-  if (document.location.href.match(exemptRegexp) === null && stupidHash(document.location.href).match(exemptRegexp) === null ) {
+                 NO, DON'T USE THIS FOR SOFTBLOCK */
+  if (document.location.href.match("facebook.com") !== null ) {
 
 
 
